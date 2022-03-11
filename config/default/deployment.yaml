@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: secret-service
+  namespace: openshift-migration
+  labels:
+    app: crane
+    service: secret-service
+spec:
+  selector:
+     matchLabels:
+       app: crane
+       service: secret-service
+  template:
+    metadata:
+      labels:
+        app: crane
+        service: secret-service
+    spec:
+      containers:
+        - name: secret-service
+          env:
+          - name: GIN_MODE
+            value: release
+          - name: CRANE_SECRET_SERVICE_CRT
+            value: /certs/tls.crt
+          - name: CRANE_SECRET_SERVICE_KEY
+            value: /certs/tls.key
+          volumeMounts:
+          - mountPath: /certs
+            name: crane-secret-service-certs
+          image: quay.io/konveyor/crane-secret-service
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8443
+              protocol: TCP
+      serviceAccountName: secret-service
+      volumes:
+      - name: crane-secret-service-certs
+        secret:
+          defaultMode: 256
+          secretName: crane-secret-service-certs
