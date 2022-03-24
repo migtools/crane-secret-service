@@ -2,8 +2,8 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -18,68 +18,95 @@ import (
 )
 
 const (
-	bearerSchema string = "Bearer"
-	apiServer    string = "https://kubernetes.default.svc"
-	port         string = ":8443"
+	bearerSchema     string = "Bearer"
+	apiServer        string = "https://kubernetes.default.svc"
+	port             string = ":8443"
+	secretRoute      string = "/api/v1/namespaces/:namespace/secrets"
+	namedSecretRoute string = "/api/v1/namespaces/:namespace/secrets/:name"
 )
+
+func getToken(ctx *gin.Context) string {
+	authHeader := ctx.Request.Header.Get("Authorization")
+	if authHeader == "" {
+		ctx.AbortWithError(http.StatusBadRequest, fmt.Errorf("No auth header provided"))
+	}
+	return authHeader[len(bearerSchema):]
+}
+
+func doProxy(ctx *gin.Context, body []byte) {
+	var proxy *httputil.ReverseProxy
+
+	baseURL, _ := url.Parse(apiServer)
+	proxy = httputil.NewSingleHostReverseProxy(baseURL)
+	if proxy == nil {
+		ctx.AbortWithStatus(http.StatusBadGateway)
+	}
+	proxy.Transport = &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	proxy.Director = func(req *http.Request) {
+		// clone the headers
+		req.Header = ctx.Request.Header.Clone()
+
+		// reset content length
+		contentLength := len(body)
+		req.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+		req.Header.Set("Content-Length", strconv.Itoa(contentLength))
+		req.ContentLength = int64(contentLength)
+
+		req.Host = baseURL.Host
+		req.URL.Scheme = baseURL.Scheme
+		req.URL.Host = baseURL.Host
+		req.URL.Path = ctx.Request.URL.Path
+	}
+
+	proxy.ServeHTTP(ctx.Writer, ctx.Request)
+}
+
+func secretHandler(ctx *gin.Context) {
+	token := getToken(ctx)
+
+	// If we aren't provided a Secret, then we should fail
+	secret := corev1.Secret{}
+	if err := ctx.BindJSON(&secret); err != nil {
+		ctx.AbortWithError(http.StatusBadRequest, err)
+	}
+	secret.StringData = map[string]string{
+		"url":   apiServer,
+		"token": token,
+	}
+	secretJson, err := json.Marshal(secret)
+	if err != nil {
+		ctx.AbortWithError(http.StatusBadRequest, err)
+	}
+
+	doProxy(ctx, secretJson)
+}
+
+func secretPatchHandler(ctx *gin.Context) {
+	token := getToken(ctx)
+
+	secretJsonPatch, _ := json.Marshal(
+		map[string]map[string]string{
+			"stringData": {
+				"url":   apiServer,
+				"token": token,
+			},
+		},
+	)
+
+	doProxy(ctx, secretJsonPatch)
+}
 
 func main() {
 	r := gin.Default()
 	r.SetTrustedProxies(nil)
 
-	// We want POST to /api/v1/namespace/:namespace/secrets
-	r.POST("*secretsPath", func(ctx *gin.Context) {
-		var proxy *httputil.ReverseProxy
-
-		// Get the token to put in the Secret
-		authHeader := ctx.Request.Header.Get("Authorization")
-		if authHeader == "" {
-			ctx.AbortWithError(http.StatusBadRequest, fmt.Errorf("No auth header provided"))
-			return
-		}
-		token := authHeader[len(bearerSchema):]
-
-		// If we aren't provided a Secret, then we should fail
-		secret := corev1.Secret{}
-		if err := ctx.BindJSON(&secret); err != nil {
-			ctx.AbortWithError(http.StatusBadRequest, err)
-		}
-		secret.StringData = map[string]string{
-			"url":   apiServer,
-			"token": token,
-		}
-		secretJson, err := json.Marshal(secret)
-		if err != nil {
-			ctx.AbortWithError(http.StatusBadRequest, err)
-		}
-
-		baseURL, _ := url.Parse(apiServer)
-		proxy = httputil.NewSingleHostReverseProxy(baseURL)
-		if proxy == nil {
-			ctx.AbortWithStatus(http.StatusBadGateway)
-		}
-		proxy.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		proxy.Director = func(req *http.Request) {
-			// clone the headers
-			req.Header = ctx.Request.Header.Clone()
-
-			// reset content length
-			contentLength := len(secretJson)
-			req.Body = ioutil.NopCloser(bytes.NewBuffer(secretJson))
-			req.Header.Set("Content-Length", strconv.Itoa(contentLength))
-			req.ContentLength = int64(contentLength)
-
-			secretPath, _ := ctx.Params.Get("secretsPath")
-			req.Host = baseURL.Host
-			req.URL.Scheme = baseURL.Scheme
-			req.URL.Host = baseURL.Host
-			req.URL.Path = secretPath
-		}
-
-		proxy.ServeHTTP(ctx.Writer, ctx.Request)
-	})
+	// We will support POST|PUT on secrets, this should allow the UI to
+	// create and update secrets as necessary (ie. when tokens expire).
+	r.POST(secretRoute, secretHandler)
+	r.PUT(namedSecretRoute, secretHandler)
+	r.PATCH(namedSecretRoute, secretPatchHandler)
 
 	crt := os.Getenv("CRANE_SECRET_SERVICE_CRT")
 	key := os.Getenv("CRANE_SECRET_SERVICE_KEY")
