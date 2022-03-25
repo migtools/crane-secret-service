@@ -11,7 +11,7 @@ API Server.
 ## Developer Installation
 
 ```shell
-kubectl apply -k github.com/konveyor/crane-secret-service/config/dev
+kubectl kustomize github.com/konveyor/crane-secret-service/config/dev | kubectl apply -f -
 ```
 
 ## Basic Usage
