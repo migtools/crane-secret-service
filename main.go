@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	corev1 "k8s.io/api/core/v1"
@@ -30,7 +31,9 @@ func getToken(ctx *gin.Context) string {
 	if authHeader == "" {
 		ctx.AbortWithError(http.StatusBadRequest, fmt.Errorf("No auth header provided"))
 	}
-	return authHeader[len(bearerSchema):]
+
+	token := authHeader[len(bearerSchema):]
+	return strings.TrimSpace(token)
 }
 
 func doProxy(ctx *gin.Context, body []byte) {
