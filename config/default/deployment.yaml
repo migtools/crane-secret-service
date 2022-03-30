@@ -34,7 +34,6 @@ spec:
           ports:
             - containerPort: 8443
               protocol: TCP
-      serviceAccountName: secret-service
       volumes:
       - name: crane-secret-service-certs
         secret:
