@@ -19,6 +19,7 @@ import (
 )
 
 const (
+	authHeader       string = "Authorization"
 	bearerSchema     string = "Bearer"
 	apiServer        string = "https://kubernetes.default.svc"
 	port             string = ":8443"
@@ -27,12 +28,12 @@ const (
 )
 
 func getToken(ctx *gin.Context) string {
-	authHeader := ctx.Request.Header.Get("Authorization")
-	if authHeader == "" {
+	auth := ctx.Request.Header.Get(authHeader)
+	if auth == "" {
 		ctx.AbortWithError(http.StatusBadRequest, fmt.Errorf("No auth header provided"))
 	}
 
-	token := authHeader[len(bearerSchema):]
+	token := auth[len(bearerSchema):]
 	return strings.TrimSpace(token)
 }
 
@@ -105,7 +106,7 @@ func main() {
 	r := gin.Default()
 	r.SetTrustedProxies(nil)
 
-	// We will support POST|PUT on secrets, this should allow the UI to
+	// We will support POST|PUT|PATCH on secrets, this should allow the UI to
 	// create and update secrets as necessary (ie. when tokens expire).
 	r.POST(secretRoute, secretHandler)
 	r.PUT(namedSecretRoute, secretHandler)
