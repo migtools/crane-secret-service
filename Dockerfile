@@ -4,7 +4,7 @@ WORKDIR /go/src/github.com/konveyor/crane
 COPY . .
 RUN go build -o /crane-secret-service main.go
 
-FROM registry.redhat.io/openshift4/ose-cli:latest as manifests
+FROM quay.io/openshift/origin-cli:latest as manifests
 COPY ./config /config
 RUN kubectl kustomize /config/default > /deploy.yaml
 
