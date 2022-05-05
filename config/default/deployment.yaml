@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: secret-service
-  namespace: openshift-migration
+  namespace: openshift-migration-toolkit
   labels:
     app: crane
     service: secret-service

@@ -3,4 +3,4 @@ kind: Kustomization
 resources:
   - deployment.yaml
   - service.yaml
-namespace: openshift-migration
+namespace: openshift-migration-toolkit
