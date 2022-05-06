@@ -18,8 +18,8 @@ kubectl kustomize github.com/konveyor/crane-secret-service/config/dev | kubectl 
 
 Get the URL for the secret-service
 
-* Get the route to the service: `oc get route -n openshift-migration secret-service -o go-template='{{ .spec.host }}'`
-* Service is also reachable inside the cluster at `https://secret-service.openshift-migration.svc.cluster.local:8443`
+* Get the route to the service: `oc get route -n openshift-migration-toolkit secret-service -o go-template='{{ .spec.host }}'`
+* Service is also reachable inside the cluster at `https://secret-service.openshift-migration-toolkit.svc.cluster.local:8443`
 
 Example request:
 
@@ -29,5 +29,5 @@ curl -k \
   -H "Content-Type: application/json" \
   -X POST \
   -d '{"apiVersion":"v1","kind":"Secret","metadata":{"name":"example"}}' \
-  https://secret-service-openshift-migration.apps-crc.testing/api/v1/namespaces/openshift-migration/secrets
+  https://secret-service-openshift-migration-toolkit.apps-crc.testing/api/v1/namespaces/openshift-migration-toolkit/secrets
 ```

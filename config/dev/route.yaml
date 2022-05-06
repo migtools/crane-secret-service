@@ -2,7 +2,7 @@ apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: secret-service
-  namespace: openshift-migration
+  namespace: openshift-migration-toolkit
   labels:
     app: crane
     service: secret-service
